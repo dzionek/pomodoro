@@ -25,7 +25,7 @@ A minimal native macOS pomodoro timer that lives in your menu bar.
 Requires macOS 13+ and the Xcode command line tools to build:
 
 ```sh
-git clone <this repo>
+git clone https://github.com/dzionek/pomodoro.git
 cd pomodoro
 ./build.sh
 open Pomodoro.app
