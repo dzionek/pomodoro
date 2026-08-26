@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     let engine = TimerEngine()
 
     private var statusItem: NSStatusItem!
@@ -10,11 +10,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = Self.tomatoIcon()
             button.imagePosition = .imageLeft
+            // Monospaced digits so the countdown doesn't change width every
+            // second, which would make the item (and an open popover) drift.
+            button.font = NSFont.monospacedDigitSystemFont(
+                ofSize: NSFont.systemFontSize, weight: .regular)
             button.action = #selector(togglePopover)
             button.target = self
         }
@@ -25,13 +30,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: root)
+        popover.delegate = self
 
         // Keep the countdown in the menu bar in sync with the engine.
         engine.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                guard let self else { return }
-                self.statusItem.button?.title = self.engine.statusText
+                // While the popover is open the title must not change:
+                // it would resize the status item and drag the popover
+                // sideways. The pending text is applied on close.
+                guard let self, !self.popover.isShown else { return }
+                self.applyStatusText()
             }
             .store(in: &cancellables)
 
@@ -51,8 +60,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // Freeze the item's width while the popover is open. Title
+            // changes (countdown ticking, phase transitions) resize the
+            // status item, which would drag the attached popover sideways.
+            // macOS 26 Tahoe misplaces status-item popovers on first show
+            // (FB20525595); showing twice in a row positions it correctly.
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        applyStatusText()
+    }
+
+    private func applyStatusText() {
+        let text = engine.statusText
+        if statusItem.button?.title != text {
+            statusItem.button?.title = text
         }
     }
 
