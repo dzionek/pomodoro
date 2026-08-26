@@ -93,6 +93,21 @@ final class TimerEngine: ObservableObject {
         phase = .idle
     }
 
+    /// End a running break early and advance the sprint as if it had finished.
+    /// Time already spent is kept in the history, marked incomplete.
+    func skipBreak() {
+        guard case .running(let kind) = phase, kind.isBreak, let start = segmentStart else { return }
+        let end = Date()
+        if end.timeIntervalSince(start) >= 60 {
+            store.add(Session(kind: kind, start: start, end: end, completed: false))
+        }
+        stopTicker()
+        segmentStart = nil
+        segmentEnd = nil
+        advancePosition(after: kind)
+        phase = .idle
+    }
+
     /// Silence the bell after a segment finished.
     func acknowledge() {
         guard case .ringing = phase else { return }

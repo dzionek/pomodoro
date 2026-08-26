@@ -115,10 +115,15 @@ struct TimerPane: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            Button("Cancel segment") { engine.cancelSegment() }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                if kind.isBreak {
+                    Button("Skip break") { engine.skipBreak() }
+                }
+                Button("Cancel segment") { engine.cancelSegment() }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
