@@ -44,6 +44,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
             .store(in: &cancellables)
 
+        // Pop the timer open when a segment finishes, so it is obvious
+        // where the bell sound is coming from.
+        engine.$phase
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] phase in
+                guard let self, case .ringing = phase, !self.popover.isShown else { return }
+                self.openPopover()
+            }
+            .store(in: &cancellables)
+
         NotificationCenter.default.addObserver(
             forName: .openStatistics, object: nil, queue: .main
         ) { [weak self] _ in
@@ -56,19 +67,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            // Freeze the item's width while the popover is open. Title
-            // changes (countdown ticking, phase transitions) resize the
-            // status item, which would drag the attached popover sideways.
-            // macOS 26 Tahoe misplaces status-item popovers on first show
-            // (FB20525595); showing twice in a row positions it correctly.
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
+            openPopover()
         }
+    }
+
+    private func openPopover() {
+        guard let button = statusItem.button else { return }
+        // macOS 26 Tahoe misplaces status-item popovers on first show
+        // (FB20525595); showing twice in a row positions it correctly.
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func popoverDidClose(_ notification: Notification) {
